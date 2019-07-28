@@ -1,0 +1,3 @@
+# chintama
+
+Chintama Game Server
