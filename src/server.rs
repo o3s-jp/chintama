@@ -1,12 +1,15 @@
-use crate::actors::{BroadcastAction, PlayerSync};
+use crate::actors::{message::ProtoMessage, stream::Stream};
 use actix::Addr;
-use gunma::{prelude::*, Config, Io, Result, Systems};
+use gunma::{components::*, prelude::*, protocol::*, Config, Io, Result, Systems};
 use log::*;
+use std::collections::HashMap;
 
 pub struct Server {
     sys: Systems,
     io: Io,
-    sockets: Vec<Addr<PlayerSync>>,
+    streams: Vec<Addr<Stream>>,
+    id: u64,
+    player: HashMap<u64, Addr<Stream>>,
 }
 
 impl Server {
@@ -22,18 +25,39 @@ impl Server {
         Ok(Server {
             sys,
             io,
-            sockets: Vec::new(),
+            streams: Vec::new(),
+            id: 0,
+            player: HashMap::new(),
         })
     }
 
-    pub fn register(&mut self, addr: Addr<PlayerSync>) {
-        self.sockets.push(addr);
+    pub fn register(&mut self, addr: Addr<Stream>) {
+        info!("New stream created");
+        self.streams.push(addr);
     }
 
-    pub fn broadcast(&mut self, msg: BroadcastAction) {
-        for addr in &self.sockets {
-            trace!("Sending {:?}", msg);
-            addr.do_send(msg.clone());
+    pub fn login(&mut self, login: Login, addr: Addr<Stream>) {
+        info!("Player login: {:?}", login);
+
+        self.id = self.id.wrapping_add(1);
+
+        let id = self.id;
+        self.player.insert(id, addr.clone());
+
+        let player = Player::new(id, CLASS_CHIBA, 10);
+        let pos = Pos::new(500.0, 300.0);
+
+        let ack = LoginAck::new(player, pos);
+        let msg = ProtoMessage(Message::LoginAck(ack), addr.clone());
+        addr.do_send(msg);
+    }
+
+    pub fn broadcast(&mut self, msg: ProtoMessage) {
+        self.streams.retain(|stream| stream.connected());
+
+        for stream in &self.streams {
+            trace!("Broadcasting {:?}", msg.0);
+            stream.do_send(msg.clone());
         }
     }
 }

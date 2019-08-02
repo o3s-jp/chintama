@@ -2,7 +2,7 @@ mod actors;
 mod server;
 
 use crate::{
-    actors::{Core, PlayerSync, PlayerSyncAddr},
+    actors::{core::Core, message::StreamAddr, stream::Stream},
     server::Server,
 };
 use actix::{Actor, Addr, StreamHandler};
@@ -17,9 +17,12 @@ fn index(
     req: HttpRequest,
     stream: web::Payload,
 ) -> Result<HttpResponse, Error> {
-    let (addr, resp) = ws::start_with_addr(PlayerSync((*data).clone()), &req, stream)?;
-    data.do_send(PlayerSyncAddr(addr));
-    info!("{:?}", resp);
+    let (addr, resp) = ws::start_with_addr(Stream::new((*data).clone()), &req, stream)?;
+
+    data.do_send(StreamAddr(addr));
+
+    info!("Response: {:?}", resp);
+
     Ok(resp)
 }
 
