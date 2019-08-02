@@ -1,18 +1,27 @@
 use crate::actors::{BroadcastAction, PlayerSync};
 use actix::Addr;
-use gunma::{Config, Result, Systems};
+use gunma::{prelude::*, Config, Io, Result, Systems};
 use log::*;
 
 pub struct Server {
     sys: Systems,
+    io: Io,
     sockets: Vec<Addr<PlayerSync>>,
 }
 
 impl Server {
     pub fn new(cfg: Config) -> Result<Self> {
-        let sys = Systems::new(cfg)?;
+        let mut io = Io::new(cfg)?;
+        let mut sys = Systems::new()?;
+
+        for t in io.get_all_terrain()? {
+            sys.create_entity()
+                .create_terrain_block(t.pos, t.size, t.asset);
+        }
+
         Ok(Server {
             sys,
+            io,
             sockets: Vec::new(),
         })
     }
